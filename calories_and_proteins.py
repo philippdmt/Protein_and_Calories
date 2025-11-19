@@ -107,7 +107,7 @@ def main():
         f"<h1 style='color:{PRIMARY_COLOR};'>Pumpfessor Joe – Nutrition Planner</h1>",
         unsafe_allow_html=True,
     )
-    st.write("Automatische Berechnung von Kalorien & Protein basierend auf Training und Körperdaten.")
+    st.write("Automatic calculation of calories and protein based on training and body data.")
 
     # Load ML model
     try:
@@ -124,11 +124,11 @@ def main():
     # -----------------------------
     # USER INPUT
     # -----------------------------
-    st.subheader("1️⃣ Personal & Workout Information")
+    st.subheader("Personal & Workout Information")
     col1, col2 = st.columns(2)
     with col1:
         gender = st.selectbox("Gender", ["Male", "Female"])
-        age = st.number_input("Age", 10, 100, 25)
+        age = st.number_input("Age", 0, 100, 25)
         height = st.number_input("Height (cm)", 120, 230, 180)
         weight = st.number_input("Weight (kg)", 35, 200, 75)
 
@@ -174,7 +174,7 @@ def main():
     # -----------------------------
     # MEAL LOGGING
     # -----------------------------
-    st.subheader("2️⃣ Log Meals")
+    st.subheader("Log Meals")
     with st.form("meal_form"):
         m1, m2, m3 = st.columns([2, 1, 1])
         meal_name = m1.text_input("Meal name", "Chicken & rice")
@@ -202,7 +202,7 @@ def main():
     # -----------------------------
     # DONUT CHARTS
     # -----------------------------
-    st.subheader("3️⃣ Progress")
+    st.subheader("Calorie Tracker")
     c1, c2 = st.columns(2)
     with c1:
         donut_chart(total_cal, target_calories, "Calories", "kcal")
