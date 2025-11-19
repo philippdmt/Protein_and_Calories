@@ -77,12 +77,15 @@ def donut_chart(consumed, total, title, unit):
     consumed = max(0, consumed)
     remaining = max(total - consumed, 0)
 
+    # Farbe: grün normal, rot wenn Ziel überschritten
+    color = "#007A3D" if consumed <= total else "#FF0000"
+
     fig, ax = plt.subplots(figsize=(3, 3), facecolor='white')
     ax.pie(
         [consumed, remaining],
         startangle=90,
         counterclock=False,
-        colors=["#007A3D", "#E0E0E0"],
+        colors=[color, "#E0E0E0"],
         wedgeprops={"width": 0.35, "edgecolor": "white"},
     )
     ax.set(aspect="equal")
@@ -95,6 +98,7 @@ def donut_chart(consumed, total, title, unit):
     )
 
     st.pyplot(fig)
+
 
 
 # -----------------------------
