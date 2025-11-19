@@ -14,7 +14,7 @@ PRIMARY_COLOR = "#007A3D"
 # ------------------------------------------------------------
 #   GITHUB CSV URL (öffentliches Repo)
 # ------------------------------------------------------------
-CSV_URL = "https://raw.githubusercontent.com/dein-benutzername/dein-repo/main/calories.csv"
+CSV_URL = "https://raw.githubusercontent.com/philippdmt/Protein_and_Calories/refs/heads/main/calories.csv"
 
 
 # -----------------------------
