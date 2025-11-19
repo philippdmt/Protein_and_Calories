@@ -1,107 +1,221 @@
-import pandas as pd
+import math
+import json
+
 import numpy as np
+import pandas as pd
+import streamlit as st
+import matplotlib.pyplot as plt
+
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, mean_absolute_error
 
-# read Dataset used for machine learning
-calories = pd.read_csv("C:/Users/phili/Documents/HSG/Computer Science/Gruppenarbeit/calories.csv")
+PRIMARY_COLOR = "#007A3D"
+
+# ------------------------------------------------------------
+#   GITHUB CSV URL (öffentliches Repo)
+# ------------------------------------------------------------
+CSV_URL = "https://raw.githubusercontent.com/dein-benutzername/dein-repo/main/calories.csv"
 
 
-def determine_training_type(Heart_Rate,Age):
-    if Heart_Rate >= 0.6 * (220 - Age):  # 60% of maximum heart frequency
+# -----------------------------
+# DATA + MODEL LOADING
+# -----------------------------
+def determine_training_type(heart_rate, age):
+    """Bestimme Trainingstyp anhand Herzfrequenz und Alter."""
+    if heart_rate >= 0.6 * (220 - age):
         return "Cardio"
     else:
         return "Kraft"
 
-calories['Training_Type'] = calories.apply(lambda row: determine_training_type(row['Heart_Rate'], row['Age']), axis=1)
 
-# target variable
-y = calories["Calories"]
+@st.cache_data
+def load_and_train_model():
+    """Lädt CSV, trainiert Lineares Regressionsmodell und gibt Modell + Features zurück."""
+    calories = pd.read_csv(CSV_URL)
 
-# choose features
-features = calories.drop(columns=['User_ID', 'Heart_Rate', 'Body_Temp','Calories'])
+    # Training_Type ableiten
+    calories["Training_Type"] = calories.apply(
+        lambda row: determine_training_type(row["Heart_Rate"], row["Age"]), axis=1
+    )
+
+    # Zielvariable
+    y = calories["Calories"]
+
+    # Features
+    features = calories.drop(columns=["User_ID", "Heart_Rate", "Body_Temp", "Calories"])
+
+    # One-hot Encoding
+    X = pd.get_dummies(features, columns=["Gender", "Training_Type"], drop_first=False)
+
+    # Train/Test Split
+    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
+
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+
+    return model, X.columns.tolist()
 
 
-# change categorical values in dummy variables
-categorical_values = ['Gender','Training_Type']
-X = pd.get_dummies(features, columns=categorical_values, drop_first=False)  # WICHTIG: drop_first=False
-
-# Split up in testset and trainingsset
-X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
-
-# Try a linear regression for machine learning
-linreg = LinearRegression()
-linreg.fit(X_train, y_train)
-
-# Predict the test set
-y_pred = linreg.predict(X_test)
-
-# Look up whether the results are reliable
-mse = mean_squared_error(y_test, y_pred)
-mae = mean_absolute_error(y_test, y_pred)
-mean_calories = np.mean(y)
-
-#Fill in the datas
-gender = "Male"
-training = "Cardio"
-goal = "Bulk"
-person = {
-    "Age": 19,
-    "Duration": 60,
-    "Weight": 80,
-    "Height": 188,
-    "Gender_Female": 1 if gender.lower() == "female" else 0,
-    "Gender_Male": 1 if gender.lower() == "male" else 0,
-    "Training_Type_Cardio": 1 if training.lower() == "cardio" else 0,
-    "Training_Type_Kraft": 1 if training.lower() == "kraft" else 0,
-    "Goal_Cut": 1 if goal.lower() == "cut" else 0,
-    "Goal_Maintain": 1 if goal.lower() == "maintain" else 0,
-    "Goal_Bulk": 1 if goal.lower() == "bulk" else 0,
-}
-
-person_df = pd.DataFrame([person])
-
-# Sicherstellen, dass ALLE Spalten wie im Trainingsdatensatz vorhanden sind
-person_df = person_df.reindex(columns=X.columns, fill_value=0)
-
-# Vorhersage
-calorie_prediction_training = float(linreg.predict(person_df)[0])
-
-print("Vorhergesagte Kalorien:", calorie_prediction_training)
-
-def grundumsatz(age, weight, height, gender): 
+# -----------------------------
+# BMR CALCULATION
+# -----------------------------
+def grundumsatz(age, weight, height, gender):
+    """Mifflin–St Jeor BMR equation."""
     if gender.lower() == "male":
-        bmr = 10 * weight + 6.25 * height - 5 * age + 5
-    elif gender.lower() == "female":
-        bmr = 10 * weight + 6.25 * height - 5 * age - 161
+        return 10 * weight + 6.25 * height - 5 * age + 5
     else:
-        raise ValueError("gender muss 'male' oder 'female' sein")
-    
-    return bmr
+        return 10 * weight + 6.25 * height - 5 * age - 161
 
-calorie_prediction_bmr = grundumsatz(
-    age=person["Age"],
-    weight=person["Weight"],
-    height=person["Height"],
-    gender=gender
-)
-calorie_prediction_bmr
 
-Total_burned_calories = calorie_prediction_bmr + calorie_prediction_training
+# -----------------------------
+# DONUT CHART
+# -----------------------------
+def donut_chart(consumed, total, title, unit):
+    if total <= 0:
+        total = 1
 
-def proteinbedarf(weight, goal):
-    goal = goal.lower()
+    consumed = max(0, consumed)
+    remaining = max(total - consumed, 0)
 
-    if goal == "cut":         # Abnehmen
-        factor = 2.0          # Mittelwert aus 1.8–2.4
-    elif goal == "maintain":  # Gewicht halten
-        factor = 1.6          # Mittelwert aus 1.4–1.8
-    elif goal == "bulk":      # Muskelaufbau / Zunehmen
-        factor = 1.9          # Mittelwert aus 1.6–2.2
+    fig, ax = plt.subplots(figsize=(3, 3), facecolor='white')
+    ax.pie(
+        [consumed, remaining],
+        startangle=90,
+        counterclock=False,
+        colors=["#007A3D", "#E0E0E0"],
+        wedgeprops={"width": 0.35, "edgecolor": "white"},
+    )
+    ax.set(aspect="equal")
+    ax.set_title(title)
+
+    ax.text(
+        0, 0,
+        f"{int(consumed)} / {int(total)} {unit}",
+        ha="center", va="center", fontsize=10
+    )
+
+    st.pyplot(fig)
+
+
+# -----------------------------
+# MAIN APP
+# -----------------------------
+def main():
+    st.set_page_config(page_title="Pumpfessor Joe – Nutrition Planner", layout="centered")
+
+    st.markdown(
+        f"<h1 style='color:{PRIMARY_COLOR};'>Pumpfessor Joe – Nutrition Planner</h1>",
+        unsafe_allow_html=True,
+    )
+    st.write("Automatische Berechnung von Kalorien & Protein basierend auf Training und Körperdaten.")
+
+    # Load ML model
+    try:
+        model, feature_columns = load_and_train_model()
+    except Exception as e:
+        st.error("Fehler beim Laden des Datensatzes. Prüfe den CSV-Link.")
+        st.exception(e)
+        return
+
+    # Initialize session state
+    if "meals" not in st.session_state:
+        st.session_state.meals = []
+
+    # -----------------------------
+    # USER INPUT
+    # -----------------------------
+    st.subheader("1️⃣ Personal & Workout Information")
+    col1, col2 = st.columns(2)
+    with col1:
+        gender = st.selectbox("Gender", ["Male", "Female"])
+        age = st.number_input("Age", 10, 100, 25)
+        height = st.number_input("Height (cm)", 120, 230, 180)
+        weight = st.number_input("Weight (kg)", 35, 200, 75)
+
+    with col2:
+        goal = st.selectbox("Goal", ["Cut", "Maintain", "Bulk"])
+        training_type = st.selectbox("Training type", ["Cardio", "Kraft"])
+        duration = st.number_input("Training duration (min)", 10, 240, 60)
+
+    # -----------------------------
+    # CALCULATIONS
+    # -----------------------------
+    person = {
+        "Age": age,
+        "Duration": duration,
+        "Weight": weight,
+        "Height": height,
+        "Gender_Female": 1 if gender.lower() == "female" else 0,
+        "Gender_Male": 1 if gender.lower() == "male" else 0,
+        "Training_Type_Cardio": 1 if training_type.lower() == "cardio" else 0,
+        "Training_Type_Kraft": 1 if training_type.lower() == "kraft" else 0,
+    }
+
+    person_df = pd.DataFrame([person])
+    person_df = person_df.reindex(columns=feature_columns, fill_value=0)
+
+    training_kcal = float(model.predict(person_df)[0])
+    bmr = grundumsatz(age, weight, height, gender)
+
+    # Goal adjustments
+    if goal.lower() == "bulk":
+        target_calories = bmr + training_kcal + 300
+        protein_per_kg = 2.0
+    elif goal.lower() == "cut":
+        target_calories = bmr + training_kcal - 300
+        protein_per_kg = 2.2
     else:
-        raise ValueError("goal muss 'cut', 'maintain' oder 'bulk' sein")
+        target_calories = bmr + training_kcal
+        protein_per_kg = 1.6
 
-    return weight * factor
+    target_calories = max(target_calories, 1200)
+    target_protein = protein_per_kg * weight
 
-protein_person = proteinbedarf(person["Weight"],goal)
+    # -----------------------------
+    # MEAL LOGGING
+    # -----------------------------
+    st.subheader("2️⃣ Log Meals")
+    with st.form("meal_form"):
+        m1, m2, m3 = st.columns([2, 1, 1])
+        meal_name = m1.text_input("Meal name", "Chicken & rice")
+        meal_cal = m2.number_input("Calories", 0, 3000, 500)
+        meal_prot = m3.number_input("Protein (g)", 0, 200, 30)
+        submitted = st.form_submit_button("Add Meal")
+
+    if submitted:
+        st.session_state.meals.append({
+            "meal": meal_name,
+            "calories": float(meal_cal),
+            "protein": float(meal_prot),
+        })
+
+    # Reset meals
+    if st.button("Reset meals"):
+        st.session_state.meals = []
+
+    # -----------------------------
+    # TOTALS
+    # -----------------------------
+    total_cal = sum(m["calories"] for m in st.session_state.meals)
+    total_prot = sum(m["protein"] for m in st.session_state.meals)
+
+    # -----------------------------
+    # DONUT CHARTS
+    # -----------------------------
+    st.subheader("3️⃣ Progress")
+    c1, c2 = st.columns(2)
+    with c1:
+        donut_chart(total_cal, target_calories, "Calories", "kcal")
+    with c2:
+        donut_chart(total_prot, target_protein, "Protein", "g")
+
+    # -----------------------------
+    # MEAL TABLE
+    # -----------------------------
+    if st.session_state.meals:
+        st.subheader("Logged meals")
+        st.table(pd.DataFrame(st.session_state.meals))
+
+
+if __name__ == "__main__":
+    main()
